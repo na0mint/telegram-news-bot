@@ -1,0 +1,41 @@
+version: '3.1'
+
+services:
+  postgres:
+    image: postgres:latest
+    restart: always
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: tg_bot_db
+      PGDATA: /db-data/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready", "-d", "db_prod" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - db:/db-data/var/lib/postgresql/data
+
+  bot:
+    build:
+      context: .
+    restart: on-failure
+    environment:
+      NFB_DATABASE_DSN: ${DB_DSN:-postgres://postgres:postgres@db:5432/postgres?sslmode=disable}
+      NFB_TELEGRAM_BOT_TOKEN: ${TG_BOT_TOKEN}
+      NFB_TELEGRAM_CHANNEL_ID: ${TG_CHANNEL_ID}
+      NFB_FETCH_INTERVAL: ${FETCH_INTERVAL}
+      NFB_NOTIFICATION_INTERVAL: ${NOTIFICATION_INTERVAL}
+      NFB_FILTER_KEYWORDS: ${FILTER_KEYWORDS}
+      NFB_OPENAI_KEY: ${OPENAI_KEY}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+volumes:
+  postgres:

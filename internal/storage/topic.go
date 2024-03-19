@@ -12,6 +12,7 @@ import (
 
 const (
 	selectAll = "SELECT * FROM topics"
+	saveTopic = "INSERT INTO topics (name, description) VALUES ($1, $2) RETURNING id"
 )
 
 type TopicPostgresStorage struct {
@@ -35,6 +36,29 @@ func (t *TopicPostgresStorage) Topics(ctx context.Context) ([]model.Topic, error
 	}
 
 	return lo.Map(topics, func(topic dbTopic, _ int) model.Topic { return model.Topic(topic) }), nil
+}
+
+func (t *TopicPostgresStorage) Save(ctx context.Context, topic model.Topic) (int64, error) {
+	conn, err := t.getConnection(ctx)
+	if err != nil {
+		return 0, err
+	}
+	utils.HandleCloseDbConnection(conn)
+
+	var id int64
+
+	row := conn.QueryRowxContext(ctx, saveTopic,
+		topic.Name, topic.Description)
+
+	if err := row.Err(); err != nil {
+		return 0, err
+	}
+
+	if err := row.Scan(&id); err != nil {
+		return 0, err
+	}
+
+	return id, nil
 }
 
 func (t *TopicPostgresStorage) getConnection(ctx context.Context) (*sqlx.Conn, error) {

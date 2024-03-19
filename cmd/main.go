@@ -93,7 +93,14 @@ func main() {
 
 	newsBot.RegisterCmdView("topics",
 		middleware.AdminOnly(config.Get().TgChannelId,
-			bot.ViewCmdListTopics(topicStorage)))
+			bot.ViewCmdListTopics(topicStorage),
+		),
+	)
+	newsBot.RegisterCmdView("addtopic",
+		middleware.AdminOnly(config.Get().TgChannelId,
+			bot.ViewCmdAddTopic(topicStorage),
+		),
+	)
 
 	go func(ctx context.Context) {
 		if err := postFetcher.Start(ctx); err != nil {

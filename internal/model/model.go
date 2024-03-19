@@ -15,6 +15,7 @@ type Source struct {
 	ID        int64
 	Name      string
 	FeedURL   string
+	TopicID   int64
 	CreatedAt time.Time
 }
 
@@ -25,5 +26,12 @@ type Article struct {
 	Link        string
 	Summary     string
 	PublishedAt time.Time
+	CreatedAt   time.Time
+}
+
+type Topic struct {
+	ID          int64
+	Name        string
+	Description string
 	CreatedAt   time.Time
 }

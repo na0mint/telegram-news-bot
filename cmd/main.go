@@ -32,17 +32,25 @@ func main() {
 		log.Printf("[ERROR] Failed to connect to database: %v", err)
 		return
 	}
-	defer db.Close()
+	defer func(db *sqlx.DB) {
+		err := db.Close()
+		if err != nil {
+			log.Printf("[ERROR] Failed to close connection to database: %v", err)
+		}
+	}(db)
 
 	var (
 		articleStorage = storage.NewArticleStorage(db)
 		sourceStorage  = storage.NewSourceStorage(db)
-		postFetcher    = fetcher.New(
+		topicStorage   = storage.NewTopicStorage(db)
+
+		postFetcher = fetcher.New(
 			articleStorage,
 			sourceStorage,
 			config.Get().FetchInterval,
 			config.Get().FilterKeywords,
 		)
+
 		tgNotifier = notifier.NewNotifier(
 			articleStorage,
 			summary.NewOpenAISummarizer(config.Get().OpenAIKey, config.Get().OpenAIPrompt),
@@ -72,11 +80,20 @@ func main() {
 			bot.ViewCmdGetSourceById(sourceStorage),
 		),
 	)
+	newsBot.RegisterCmdView("sourcesByTopicId",
+		middleware.AdminOnly(config.Get().TgChannelId,
+			bot.ViewCmdListSourcesByTopic(sourceStorage),
+		),
+	)
 	newsBot.RegisterCmdView("deletesource",
 		middleware.AdminOnly(config.Get().TgChannelId,
 			bot.ViewCmdDeleteSource(sourceStorage),
 		),
 	)
+
+	newsBot.RegisterCmdView("topics",
+		middleware.AdminOnly(config.Get().TgChannelId,
+			bot.ViewCmdListTopics(topicStorage)))
 
 	go func(ctx context.Context) {
 		if err := postFetcher.Start(ctx); err != nil {

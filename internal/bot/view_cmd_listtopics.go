@@ -10,25 +10,25 @@ import (
 	"tg-bot/internal/model"
 )
 
-type SourceLister interface {
-	Sources(ctx context.Context) ([]model.Source, error)
+type TopicLister interface {
+	Topics(ctx context.Context) ([]model.Topic, error)
 }
 
-func ViewCmdListSources(lister SourceLister) botkit.ViewFunc {
+func ViewCmdListTopics(lister TopicLister) botkit.ViewFunc {
 	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
-		sources, err := lister.Sources(ctx)
+		topics, err := lister.Topics(ctx)
 		if err != nil {
 			return err
 		}
 
 		var (
-			sourceInfo = lo.Map(sources, func(source model.Source, _ int) string {
-				return FormatSource(source)
+			sourceInfo = lo.Map(topics, func(topic model.Topic, _ int) string {
+				return FormatTopic(topic)
 			})
 
 			msgText = fmt.Sprintf(
 				"Sources \\(total %d\\):\n\n%s",
-				len(sources),
+				len(topics),
 				strings.Join(sourceInfo, "\n\n"),
 			)
 		)

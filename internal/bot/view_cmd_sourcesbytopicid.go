@@ -4,17 +4,18 @@ import (
 	"context"
 	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/samber/lo"
 	"strconv"
+	"strings"
 	"tg-bot/internal/botkit"
-	"tg-bot/internal/botkit/markup"
 	"tg-bot/internal/model"
 )
 
-type SourceFinder interface {
-	SourceById(ctx context.Context, id int64) (*model.Source, error)
+type SourceByTopicLister interface {
+	SourcesByTopicId(ctx context.Context, topicId int64) ([]model.Source, error)
 }
 
-func ViewCmdGetSourceById(finder SourceFinder) botkit.ViewFunc {
+func ViewCmdListSourcesByTopic(lister SourceByTopicLister) botkit.ViewFunc {
 	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
 		targetId, err := strconv.ParseInt(update.Message.CommandArguments(),
 			10, 64)
@@ -28,20 +29,24 @@ func ViewCmdGetSourceById(finder SourceFinder) botkit.ViewFunc {
 			return err
 		}
 
-		source, err := finder.SourceById(ctx, targetId)
+		sources, err := lister.SourcesByTopicId(ctx, targetId)
+		if err != nil {
+			return err
+		}
 
 		var (
-			msgText = fmt.Sprintf(
-				"🌐 *%s*\nID: `%d`\nFeed URL: %s\nTopic ID: `%d`",
-				markup.EscapeForMarkdown(source.Name),
-				source.ID,
-				markup.EscapeForMarkdown(source.FeedURL),
-				source.TopicID,
-			)
+			sourceInfo = lo.Map(sources, func(source model.Source, _ int) string {
+				return FormatSource(source)
+			})
 
-			reply = tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+			msgText = fmt.Sprintf(
+				"Sources \\(total %d\\):\n\n%s",
+				len(sources),
+				strings.Join(sourceInfo, "\n\n"),
+			)
 		)
 
+		reply := tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
 		reply.ParseMode = tgbotapi.ModeMarkdownV2
 
 		if _, err := api.Send(reply); err != nil {

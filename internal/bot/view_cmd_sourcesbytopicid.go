@@ -15,7 +15,7 @@ type SourceByTopicLister interface {
 	SourcesByTopicId(ctx context.Context, topicId int64) ([]model.Source, error)
 }
 
-func ViewCmdListSourcesByTopic(lister SourceByTopicLister) botkit.ViewFunc {
+func ViewCmdListSourcesByTopicId(lister SourceByTopicLister) botkit.ViewFunc {
 	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
 		targetId, err := strconv.ParseInt(update.Message.CommandArguments(),
 			10, 64)

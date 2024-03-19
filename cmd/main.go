@@ -82,7 +82,7 @@ func main() {
 	)
 	newsBot.RegisterCmdView("sourcesByTopicId",
 		middleware.AdminOnly(config.Get().TgChannelId,
-			bot.ViewCmdListSourcesByTopic(sourceStorage),
+			bot.ViewCmdListSourcesByTopicId(sourceStorage),
 		),
 	)
 	newsBot.RegisterCmdView("deletesource",

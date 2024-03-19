@@ -14,8 +14,9 @@ type SourceStorage interface {
 
 func ViewCmdAddSource(storage SourceStorage) botkit.ViewFunc {
 	type addSourceArgs struct {
-		Name string `json:"name"`
-		URL  string `json:"url"`
+		Name    string `json:"name"`
+		URL     string `json:"url"`
+		TopicID int64  `json:"topicID"`
 	}
 
 	return func(ctx context.Context, api *tgbotapi.BotAPI, update tgbotapi.Update) error {
@@ -33,6 +34,7 @@ func ViewCmdAddSource(storage SourceStorage) botkit.ViewFunc {
 		source := model.Source{
 			Name:    args.Name,
 			FeedURL: args.URL,
+			TopicID: args.TopicID,
 		}
 
 		sourceID, err := storage.Save(ctx, source)

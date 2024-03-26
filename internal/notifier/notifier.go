@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"github.com/go-shiori/go-readability"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/samber/lo"
 	"io"
+	"log"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 	"tg-bot/internal/botkit/markup"
 	"tg-bot/internal/model"
@@ -18,9 +21,16 @@ var (
 	NewLinesRegexp = regexp.MustCompile(`\n{3,}`)
 )
 
+const articlesOffset int64 = 1000
+
 type ArticleProvider interface {
 	FindAllNotPosted(ctx context.Context, since time.Time, limit int64) ([]model.Article, error)
 	MarkPostedById(ctx context.Context, id int64) error
+}
+
+type SourceProvider interface {
+	SourcesByTopicId(ctx context.Context, topicId int64) ([]model.Source, error)
+	Sources(ctx context.Context) ([]model.Source, error)
 }
 
 type Summarizer interface {
@@ -29,6 +39,7 @@ type Summarizer interface {
 
 type Notifier struct {
 	articles         ArticleProvider
+	sources          SourceProvider
 	summarizer       Summarizer
 	bot              *tgbotapi.BotAPI
 	sendInterval     time.Duration
@@ -36,19 +47,24 @@ type Notifier struct {
 	channelId        int64
 }
 
-func NewNotifier(articles ArticleProvider,
+func NewNotifier(
+	articles ArticleProvider,
+	sources SourceProvider,
 	summarizer Summarizer,
 	bot *tgbotapi.BotAPI,
 	sendInterval time.Duration,
 	lookupTimeWindow time.Duration,
 	channelId int64,
 ) *Notifier {
-	return &Notifier{articles: articles,
+	return &Notifier{
+		articles:         articles,
+		sources:          sources,
 		summarizer:       summarizer,
 		bot:              bot,
 		sendInterval:     sendInterval,
 		lookupTimeWindow: lookupTimeWindow,
-		channelId:        channelId}
+		channelId:        channelId,
+	}
 }
 
 func (n *Notifier) Start(ctx context.Context) error {
@@ -72,7 +88,7 @@ func (n *Notifier) Start(ctx context.Context) error {
 }
 
 func (n *Notifier) SelectAndSendArticle(ctx context.Context) error {
-	topArticles, err := n.articles.FindAllNotPosted(ctx, time.Now().Add(-n.lookupTimeWindow), 1)
+	topArticles, err := n.articles.FindAllNotPosted(ctx, time.Now().Add(-n.lookupTimeWindow), articlesOffset)
 	if err != nil {
 		return err
 	}
@@ -81,18 +97,50 @@ func (n *Notifier) SelectAndSendArticle(ctx context.Context) error {
 		return nil
 	}
 
-	article := topArticles[0]
-
-	summary, err := n.extractSummary(ctx, article)
+	sources, err := n.sources.Sources(ctx)
 	if err != nil {
 		return err
 	}
 
-	if err := n.sendArticle(summary, article); err != nil {
-		return err
+	for _, topicId := range getUniqueTopicIds(sources) {
+
+		sourcesForTopicId := lo.Filter(sources, func(source model.Source, _ int) bool {
+			return source.TopicID == topicId
+		})
+
+		sourceIds := lo.Map(sourcesForTopicId, func(source model.Source, _ int) int64 {
+			return source.ID
+		})
+
+		article := lo.Filter(topArticles, func(article model.Article, _ int) bool {
+			return slices.Contains(sourceIds, article.SourceID)
+		})[0]
+
+		summary, err := n.extractSummary(ctx, article)
+		if err != nil {
+			return err
+		}
+
+		if err := n.sendArticle(summary, article); err != nil {
+			return err
+		}
+
+		if err := n.articles.MarkPostedById(ctx, article.ID); err != nil {
+			return err
+		}
 	}
 
-	return n.articles.MarkPostedById(ctx, article.ID)
+	return nil
+}
+
+func getUniqueTopicIds(sources []model.Source) []int64 {
+	topicIds := make([]int64, 0, len(sources))
+
+	for _, source := range sources {
+		topicIds = append(topicIds, source.TopicID)
+	}
+
+	return lo.Uniq(topicIds)
 }
 
 func (n *Notifier) extractSummary(ctx context.Context, article model.Article) (string, error) {
@@ -105,7 +153,12 @@ func (n *Notifier) extractSummary(ctx context.Context, article model.Article) (s
 		if err != nil {
 			return "", err
 		}
-		defer response.Body.Close()
+		defer func(Body io.ReadCloser) {
+			err := Body.Close()
+			if err != nil {
+				log.Printf("[ERROR] Failed to close response body: %v", err)
+			}
+		}(response.Body)
 
 		reader = response.Body
 	}

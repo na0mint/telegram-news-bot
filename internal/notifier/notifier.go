@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"tg-bot/internal/botkit/markup"
+	"tg-bot/internal/config"
 	"tg-bot/internal/model"
 	"time"
 )
@@ -21,7 +22,10 @@ var (
 	NewLinesRegexp = regexp.MustCompile(`\n{3,}`)
 )
 
-const articlesOffset int64 = 1000
+const (
+	articlesOffset int64  = 1000
+	translation    string = "translation"
+)
 
 type ArticleProvider interface {
 	FindAllNotPosted(ctx context.Context, since time.Time, limit int64) ([]model.Article, error)
@@ -33,14 +37,14 @@ type SourceProvider interface {
 	Sources(ctx context.Context) ([]model.Source, error)
 }
 
-type Summarizer interface {
-	Summarize(ctx context.Context, text string) (string, error)
+type OpenAIClient interface {
+	Request(ctx context.Context, text string, prompt string) (string, error)
 }
 
 type Notifier struct {
 	articles         ArticleProvider
 	sources          SourceProvider
-	summarizer       Summarizer
+	openAIClient     OpenAIClient
 	bot              *tgbotapi.BotAPI
 	sendInterval     time.Duration
 	lookupTimeWindow time.Duration
@@ -50,7 +54,7 @@ type Notifier struct {
 func NewNotifier(
 	articles ArticleProvider,
 	sources SourceProvider,
-	summarizer Summarizer,
+	summarizer OpenAIClient,
 	bot *tgbotapi.BotAPI,
 	sendInterval time.Duration,
 	lookupTimeWindow time.Duration,
@@ -59,7 +63,7 @@ func NewNotifier(
 	return &Notifier{
 		articles:         articles,
 		sources:          sources,
-		summarizer:       summarizer,
+		openAIClient:     summarizer,
 		bot:              bot,
 		sendInterval:     sendInterval,
 		lookupTimeWindow: lookupTimeWindow,
@@ -116,12 +120,16 @@ func (n *Notifier) SelectAndSendArticle(ctx context.Context) error {
 			return slices.Contains(sourceIds, article.SourceID)
 		})[0]
 
-		summary, err := n.extractSummary(ctx, article)
+		postSource, _ := lo.Find(sourcesForTopicId, func(source model.Source) bool {
+			return source.ID == article.SourceID
+		})
+
+		postText, err := n.extractSummary(ctx, article, postSource.Type)
 		if err != nil {
 			return err
 		}
 
-		if err := n.sendArticle(summary, article); err != nil {
+		if err := n.sendArticle(postText, article); err != nil {
 			return err
 		}
 
@@ -143,7 +151,7 @@ func getUniqueTopicIds(sources []model.Source) []int64 {
 	return lo.Uniq(topicIds)
 }
 
-func (n *Notifier) extractSummary(ctx context.Context, article model.Article) (string, error) {
+func (n *Notifier) extractSummary(ctx context.Context, article model.Article, postType string) (string, error) {
 	var reader io.Reader
 
 	if article.Summary != "" {
@@ -168,12 +176,26 @@ func (n *Notifier) extractSummary(ctx context.Context, article model.Article) (s
 		return "", err
 	}
 
-	summary, err := n.summarizer.Summarize(ctx, cleanText(doc.TextContent))
-	if err != nil {
-		return "", err
-	}
+	switch postType {
+	case translation:
+		translation, err := n.openAIClient.Request(ctx, cleanText(doc.TextContent), config.Get().OpenAITranslationPrompt)
+		if err != nil {
+			return "", err
+		}
 
-	return "\n\n" + summary, nil
+		log.Println("Translation post")
+
+		return "\n\n" + translation, nil
+	default:
+		summary, err := n.openAIClient.Request(ctx, cleanText(doc.TextContent), config.Get().OpenAIDefaultPrompt)
+		if err != nil {
+			return "", err
+		}
+
+		log.Println("Summary post")
+
+		return "\n\n" + summary, nil
+	}
 }
 
 func cleanText(text string) string {

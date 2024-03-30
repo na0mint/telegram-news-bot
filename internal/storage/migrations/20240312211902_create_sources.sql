@@ -6,6 +6,7 @@ create table Sources
     name       varchar(255)                                    not null,
     feed_url   varchar(255)                                    not null unique,
     topic_id   bigint references Topics (id) on delete cascade not null,
+    type       varchar(255)                                    not null,
     created_at timestamp                                       not null default now()
 );
 -- +goose StatementEnd

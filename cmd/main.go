@@ -54,7 +54,7 @@ func main() {
 		tgNotifier = notifier.NewNotifier(
 			articleStorage,
 			sourceStorage,
-			summary.NewOpenAISummarizer(config.Get().OpenAIKey, config.Get().OpenAIPrompt),
+			summary.NewOpenAIClient(config.Get().OpenAIKey),
 			botAPI,
 			config.Get().NotificationInterval,
 			2*config.Get().FetchInterval,

@@ -11,22 +11,21 @@ import (
 
 const (
 	aiModel           string  = "gpt-3.5-turbo"
-	openAiMaxTokens   int     = 256
-	openAiTemperature float32 = 0.7
-	openAiTopP        float32 = 1
+	openAiMaxTokens   int     = 1000
+	openAiTemperature float32 = 0.3
+	openAiTopP        float32 = 0.6
 )
 
-type OpenAISummarizer struct {
+type OpenAIClient struct {
 	client  *openai.Client
-	prompt  string
 	enabled bool
 	mu      sync.Mutex
 }
 
-func NewOpenAISummarizer(apiKey string, prompt string) *OpenAISummarizer {
-	s := &OpenAISummarizer{
+func NewOpenAIClient(apiKey string) *OpenAIClient {
+	s := &OpenAIClient{
 		client: openai.NewClient(apiKey),
-		prompt: prompt}
+	}
 
 	s.enabled = apiKey != ""
 	log.Printf("openai summarizer enabled: %v", s.enabled)
@@ -34,7 +33,7 @@ func NewOpenAISummarizer(apiKey string, prompt string) *OpenAISummarizer {
 	return s
 }
 
-func (s *OpenAISummarizer) Summarize(ctx context.Context, text string) (string, error) {
+func (s *OpenAIClient) Request(ctx context.Context, text string, prompt string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -47,7 +46,7 @@ func (s *OpenAISummarizer) Summarize(ctx context.Context, text string) (string, 
 		Messages: []openai.ChatCompletionMessage{
 			{
 				Role:    openai.ChatMessageRoleSystem,
-				Content: fmt.Sprintf("%s%s", text, s.prompt),
+				Content: fmt.Sprintf("%s%s", text, prompt),
 			},
 		},
 		MaxTokens:   openAiMaxTokens,

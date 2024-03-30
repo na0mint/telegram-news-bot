@@ -16,6 +16,7 @@ type Source struct {
 	Name      string
 	FeedURL   string
 	TopicID   int64
+	Type      string
 	CreatedAt time.Time
 }
 

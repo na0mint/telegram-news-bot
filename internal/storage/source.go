@@ -13,7 +13,7 @@ import (
 const (
 	selectAllSources string = "SELECT * from sources"
 	findSourceById   string = "SELECT * from sources where id = $1"
-	saveSource       string = "INSERT INTO sources (name, feed_url, topic_id) VALUES ($1, $2, $3) RETURNING id"
+	saveSource       string = "INSERT INTO sources (name, feed_url, topic_id, type) VALUES ($1, $2, $3, $4) RETURNING id"
 	deleteSource     string = "DELETE FROM sources WHERE id = $1"
 	sourcesByTopicId string = "SELECT * FROM sources where topic_id = $1"
 )
@@ -85,7 +85,7 @@ func (s *SourcePostgresStorage) Save(ctx context.Context, source model.Source) (
 	var id int64
 
 	row := conn.QueryRowxContext(ctx, saveSource,
-		source.Name, source.FeedURL, source.TopicID)
+		source.Name, source.FeedURL, source.TopicID, source.Type)
 
 	if err := row.Err(); err != nil {
 		return 0, err
@@ -127,5 +127,6 @@ type dbSource struct {
 	Name      string    `db:"name"`
 	FeedURL   string    `db:"feed_url"`
 	TopicID   int64     `db:"topic_id"`
+	Type      string    `db:"type"`
 	CreatedAt time.Time `db:"created_at"`
 }

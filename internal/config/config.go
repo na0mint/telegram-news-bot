@@ -9,14 +9,15 @@ import (
 )
 
 type Config struct {
-	TgBotToken           string        `hcl:"tg_bot_token" env:"TG_BOT_TOKEN" required:"true"`
-	TgChannelId          int64         `hcl:"tg_channel_id" env:"TG_CHANNEL_ID" required:"true"`
-	DbDSN                string        `hcl:"db_dsn" env:"DB_DSN" default:"postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"`
-	FetchInterval        time.Duration `hcl:"fetch_interval" env:"FETCH_INTERVAL" default:"1000m"`
-	NotificationInterval time.Duration `hcl:"notification_interval" env:"NOTIFICATION_INTERVAL" default:"10m"`
-	FilterKeywords       []string      `hcl:"filter_keywords" env:"FILTER_KEYWORDS"`
-	OpenAIKey            string        `hcl:"open_ai_key" env:"OPENAI_KEY"`
-	OpenAIPrompt         string        `hcl:"open_ai_prompt" env:"OPENAI_PROMPT"`
+	TgBotToken              string        `hcl:"tg_bot_token" env:"TG_BOT_TOKEN" required:"true"`
+	TgChannelId             int64         `hcl:"tg_channel_id" env:"TG_CHANNEL_ID" required:"true"`
+	DbDSN                   string        `hcl:"db_dsn" env:"DB_DSN" default:"postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"`
+	FetchInterval           time.Duration `hcl:"fetch_interval" env:"FETCH_INTERVAL" default:"100000m"`
+	NotificationInterval    time.Duration `hcl:"notification_interval" env:"NOTIFICATION_INTERVAL" default:"1m"`
+	FilterKeywords          []string      `hcl:"filter_keywords" env:"FILTER_KEYWORDS"`
+	OpenAIKey               string        `hcl:"open_ai_key" env:"OPENAI_KEY"`
+	OpenAIDefaultPrompt     string        `hcl:"open_ai_default_prompt" env:"OPENAI_DEFAULT_PROMPT"`
+	OpenAITranslationPrompt string        `hcl:"open_ai_translation_prompt" env:"OPENAI_TRANSLATION_PROMPT"`
 }
 
 var (

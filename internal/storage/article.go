@@ -3,18 +3,21 @@ package storage
 import (
 	"context"
 	"database/sql"
-	"github.com/jmoiron/sqlx"
-	"github.com/samber/lo"
 	"log"
 	"tg-bot/internal/model"
 	"tg-bot/internal/utils"
 	"time"
+
+	"github.com/jmoiron/sqlx"
+	"github.com/samber/lo"
 )
 
 const (
-	saveArticle      string = "INSERT INTO articles (source_id, title, link, summary, published_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING"
-	findAllNotPosted string = "SELECT * FROM articles where posted_at IS NULL AND published_at >= $1::timestamp ORDER BY published_at DESC LIMIT $2"
-	markPosted              = "UPDATE articles SET posted_at = now() WHERE id = $1"
+	saveArticle         string = "INSERT INTO articles (source_id, title, link, summary, published_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING"
+	findAllNotPosted    string = "SELECT * FROM articles where posted_at IS NULL AND published_at >= $1::timestamp ORDER BY published_at DESC LIMIT $2"
+	markPosted          string = "UPDATE articles SET posted_at = now() WHERE id = $1"
+	deletePosted        string = "DELETE FROM articles WHERE posted_at IS NOT NULL"
+	minutesCleanInteral int    = 120
 )
 
 type ArticlePostgresStorage struct {
@@ -85,6 +88,21 @@ func (a *ArticlePostgresStorage) MarkPostedById(ctx context.Context, id int64) e
 	return nil
 }
 
+func (a *ArticlePostgresStorage) StartCleaner(ctx context.Context) error {
+	ticker := time.NewTicker(time.Minute * 12)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+
+		case <-ticker.C:
+			a.deletePosted(ctx)
+		}
+	}
+}
+
 func (a *ArticlePostgresStorage) getConnection(ctx context.Context) (*sqlx.Conn, error) {
 	conn, err := a.db.Connx(ctx)
 	if err != nil {
@@ -93,6 +111,20 @@ func (a *ArticlePostgresStorage) getConnection(ctx context.Context) (*sqlx.Conn,
 	}
 
 	return conn, nil
+}
+
+func (a *ArticlePostgresStorage) deletePosted(ctx context.Context) error {
+	conn, err := a.getConnection(ctx)
+	if err != nil {
+		return err
+	}
+	defer utils.HandleCloseDbConnection(conn)
+
+	if _, err = conn.ExecContext(ctx, deletePosted); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type dbArticle struct {

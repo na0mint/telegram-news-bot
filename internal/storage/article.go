@@ -13,11 +13,11 @@ import (
 )
 
 const (
-	saveArticle         string = "INSERT INTO articles (source_id, title, link, summary, published_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING"
-	findAllNotPosted    string = "SELECT * FROM articles where posted_at IS NULL AND published_at >= $1::timestamp ORDER BY published_at DESC LIMIT $2"
-	markPosted          string = "UPDATE articles SET posted_at = now() WHERE id = $1"
-	deletePosted        string = "DELETE FROM articles WHERE posted_at IS NOT NULL"
-	minutesCleanInteral int    = 120
+	saveArticle          string = "INSERT INTO articles (source_id, title, link, summary, published_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING"
+	findAllNotPosted     string = "SELECT * FROM articles where posted_at IS NULL AND published_at >= $1::timestamp ORDER BY published_at DESC LIMIT $2"
+	markPosted           string = "UPDATE articles SET posted_at = now() WHERE id = $1"
+	deletePosted         string = "DELETE FROM articles WHERE posted_at IS NOT NULL"
+	minutesCleanInterval int    = 120
 )
 
 type ArticlePostgresStorage struct {
@@ -89,7 +89,7 @@ func (a *ArticlePostgresStorage) MarkPostedById(ctx context.Context, id int64) e
 }
 
 func (a *ArticlePostgresStorage) StartCleaner(ctx context.Context) error {
-	ticker := time.NewTicker(time.Minute * 12)
+	ticker := time.NewTicker(time.Minute * time.Duration(minutesCleanInterval))
 	defer ticker.Stop()
 
 	for {
@@ -98,7 +98,10 @@ func (a *ArticlePostgresStorage) StartCleaner(ctx context.Context) error {
 			return ctx.Err()
 
 		case <-ticker.C:
-			a.deletePosted(ctx)
+			err := a.deletePosted(ctx)
+			if err != nil {
+				return err
+			}
 		}
 	}
 }

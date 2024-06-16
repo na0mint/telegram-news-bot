@@ -176,9 +176,13 @@ func (n *Notifier) extractSummary(ctx context.Context, article model.Article, po
 		return "", err
 	}
 
+	return n.makeSummary(ctx, doc, postType)
+}
+
+func (n *Notifier) makeSummary(ctx context.Context, article readability.Article, postType string) (string, error) {
 	switch postType {
 	case translation:
-		translation, err := n.openAIClient.Request(ctx, cleanText(doc.TextContent), config.Get().OpenAITranslationPrompt)
+		translation, err := n.openAIClient.Request(ctx, cleanText(article.TextContent), config.Get().OpenAITranslationPrompt)
 		if err != nil {
 			return "", err
 		}
@@ -187,7 +191,7 @@ func (n *Notifier) extractSummary(ctx context.Context, article model.Article, po
 
 		return "\n\n" + translation, nil
 	default:
-		summary, err := n.openAIClient.Request(ctx, cleanText(doc.TextContent), config.Get().OpenAIDefaultPrompt)
+		summary, err := n.openAIClient.Request(ctx, cleanText(article.TextContent), config.Get().OpenAIDefaultPrompt)
 		if err != nil {
 			return "", err
 		}

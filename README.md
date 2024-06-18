@@ -5,7 +5,7 @@ Bot for Telegram that gets and posts news to a channel.
 # Features
 
 - Fetching articles from RSS feeds
-- Article summaries powered by GPT-3.5
+- Article summaries powered by GPT-3.5 or llama3
 - Admin commands for managing sources
 
 # Configuration

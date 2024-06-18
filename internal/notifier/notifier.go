@@ -37,14 +37,14 @@ type SourceProvider interface {
 	Sources(ctx context.Context) ([]model.Source, error)
 }
 
-type OpenAIClient interface {
+type AIClient interface {
 	Request(ctx context.Context, text string, prompt string) (string, error)
 }
 
 type Notifier struct {
 	articles         ArticleProvider
 	sources          SourceProvider
-	openAIClient     OpenAIClient
+	openAIClient     AIClient
 	bot              *tgbotapi.BotAPI
 	sendInterval     time.Duration
 	lookupTimeWindow time.Duration
@@ -54,7 +54,7 @@ type Notifier struct {
 func NewNotifier(
 	articles ArticleProvider,
 	sources SourceProvider,
-	summarizer OpenAIClient,
+	summarizer AIClient,
 	bot *tgbotapi.BotAPI,
 	sendInterval time.Duration,
 	lookupTimeWindow time.Duration,
@@ -182,7 +182,7 @@ func (n *Notifier) extractSummary(ctx context.Context, article model.Article, po
 func (n *Notifier) makeSummary(ctx context.Context, article readability.Article, postType string) (string, error) {
 	switch postType {
 	case translation:
-		translation, err := n.openAIClient.Request(ctx, cleanText(article.TextContent), config.Get().OpenAITranslationPrompt)
+		translation, err := n.openAIClient.Request(ctx, cleanText(article.TextContent), config.Get().AITranslationPrompt)
 		if err != nil {
 			return "", err
 		}
@@ -191,7 +191,7 @@ func (n *Notifier) makeSummary(ctx context.Context, article readability.Article,
 
 		return "\n\n" + translation, nil
 	default:
-		summary, err := n.openAIClient.Request(ctx, cleanText(article.TextContent), config.Get().OpenAIDefaultPrompt)
+		summary, err := n.openAIClient.Request(ctx, cleanText(article.TextContent), config.Get().AIDefaultPrompt)
 		if err != nil {
 			return "", err
 		}

@@ -39,6 +39,18 @@ func main() {
 		}
 	}(db)
 
+	var aiClient notifier.AIClient
+
+	if config.Get().IsLocalLLM {
+		aiClient, err = summary.NewLocalLLM()
+	} else {
+		aiClient = summary.NewOpenAIClient(config.Get().OpenAIKey)
+	}
+	if err != nil {
+		log.Printf("[ERROR] Failed to create an AI client: %v", err)
+		return
+	}
+
 	var (
 		articleStorage = storage.NewArticleStorage(db)
 		sourceStorage  = storage.NewSourceStorage(db)
@@ -54,7 +66,7 @@ func main() {
 		tgNotifier = notifier.NewNotifier(
 			articleStorage,
 			sourceStorage,
-			summary.NewOpenAIClient(config.Get().OpenAIKey),
+			aiClient,
 			botAPI,
 			config.Get().NotificationInterval,
 			2*config.Get().FetchInterval,
